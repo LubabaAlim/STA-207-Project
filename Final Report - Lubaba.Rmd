@@ -1,0 +1,713 @@
+---
+title: "Association Between First Grade Math Scores and Class Types"
+author: "Lubaba Ferdous Alim"
+date: "03/18/2024"
+output: 
+  rmdformats::downcute:
+    self_contained: true
+    thumbnails: false
+    lightbox: true
+    gallery: false
+    code_folding: hide
+bibliography: references.bib
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.pos = 'H', fig.align='center')
+knitr::opts_chunk$set(cache = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+library(haven)
+library(kableExtra)
+library(vtable)
+library(dplyr)
+library(ggplot2)
+library(car)
+library(GGally)
+library(gridExtra)
+library(geomtextpath)
+library(lmtest)
+library(multcomp)
+library(lme4)
+library(lmerTest)
+library(DT)
+```
+
+# Abstract
+
+By analyzing the Project STAR dataset, it was found that students of small class
+size of approximately 15-17 show a higher math scaled scores in grade 1 compared
+to classes of regular size and regular size with aide. Among many, the most
+important policy that was recommended to schools to adopt was to intervene and
+maintain a small class size from early grades and maximize the benefits of class
+size reduction. [@Achilles_2012]
+
+# Introduction
+
+The randomized, longitudinal study known as The Tennessee Student Teacher
+Achievement Ratio (STAR) was conducted between 1985 to 1989 led to identify the
+long-term positive impacts small sized classrooms have on pupils. The study
+invited all K-3 Tennessee schools to participate with the condition to be able
+to form at least one of the three class types: small, regular and regular with a
+full-time teacher aide.
+
+Using the STAR dataset, this project aims to find answers to two questions of
+interest:
+
+1.  The first is to see if there is any difference in the math scaled scores
+    across grade 1 students as a result of different class types.
+2.  If yes, the second is to see which class type is associated with the highest
+    math scaled scores in 1st grade.
+
+The motivation behind this analysis lies in finding out whether there is an
+association between class size and the performance of students to identify and
+recommend policy actions that will cause long term benefits for students as well
+the society.
+
+# Background
+
+The State Department of Education conducted a four-year longitudinal study known
+as The Student/Teacher Achievement Ratio (STAR) in the late 1980s funded by the
+Tennessee General Assembly [@DVN/SIWH9F_2008]. The dataset used in this analysis
+has been obtained from Harvard Dataverse [@DVN/SIWH9F_2008]. The study adopted
+the following sampling mechanism: [@Achilles_2012]
+
+1.  On average just under 7000 students per grade from approximately 79 schools
+    participated in this experiment. The full dataset includes 379 variables for
+    11601 students.
+2.  To ensure that sample included students from different socio-economic
+    backgrounds, schools from inner-city, suburban, urban and rural locations
+    were included.
+3.  To avoid bright students and exemplary teachers from having an effect on
+    test scores, they were randomly assigned to different class types.
+
+Moreover, the study had some additional features: [@Achilles_2012]
+
+1.  Information of students were only disclosed to principal investigators as
+    well as their staff, wherein only aggregate reports of students' results
+    were disclosed to secure a pupil's demographic and individual test-score
+    data.
+2.  Prior to Project STAR, students were enrolled in regular sized class with
+    number of pupils ranging from approximately 22-25. As a result, this ensured
+    that no children received less of a service by participating in STAR.
+3.  During the time of the standardized test, it was ensured that no teachers
+    assisted the pupils to complete their exams.
+4.  To ensure guaranteed impartial results, the statistician, Jeremy Finn, who
+    later analyzed the study, was chosen because he had no participation in the
+    study and had no contact with the principal investigators and staff.
+
+The short-term effect of small class size was seen to benefit almost all
+students, especially students with low income background, minority, and male
+students. They were seen to benefit from small class sizes with better test
+results and school participation as well as reduced grade retention and
+dropouts.
+
+In this project, we perform descriptive and inferential analysis on a subset of
+the STAR dataset to study the association between class size and math scaled
+scores of grade 1 students and address the proposed questions of interest.
+
+Since we are only interested in the grade 1 math scale sores of the students,
+the variables chosen are as listed in Table 1.
+
++----------------+-------------------------------+----------------------------+
+| Variable Name  | Description                   | Levels                     |
++================+===============================+============================+
+| g1dchid        | Grade 1 School ID             |                            |
++----------------+-------------------------------+----------------------------+
+| g1surban       | School urbanicity grade 1     | 1 = Inner city\            |
+|                |                               | 2 = Suburban\              |
+|                |                               | 3 = Rural\                 |
+|                |                               | 4 = Urban                  |
++----------------+-------------------------------+----------------------------+
+| g1tchid        | Grade 1 Teacher ID            |                            |
++----------------+-------------------------------+----------------------------+
+| g1thighdegree  | Teacher highest degree grade  | 2 = Bachelors\             |
+|                | 1                             | 3 = Masters\               |
+|                |                               | 5 = Specialist\            |
+|                |                               | 6 = Doctoral               |
++----------------+-------------------------------+----------------------------+
+| g1tcareer      | Teacher career ladder level   | 1 = Choose not to be on    |
+|                | grade 1                       | career ladder\             |
+|                |                               | 2 = Apprentice\            |
+|                |                               | 3 = Probation\             |
+|                |                               | 4 = Ladder level 1\        |
+|                |                               | 5 = Ladder level 2\        |
+|                |                               | 6 = Ladder level 3         |
++----------------+-------------------------------+----------------------------+
+| g1tyears       | Years of total teaching       |                            |
+|                | experience grade 1            |                            |
++----------------+-------------------------------+----------------------------+
+| g1classtype    | Grade 1 Class Type            | 1 = Small class\           |
+|                |                               | 2 = Regular class\         |
+|                |                               | 3 = Regular class with     |
+|                |                               | aide                       |
++----------------+-------------------------------+----------------------------+
+| g1classsize    | Class size grade 1            |                            |
++----------------+-------------------------------+----------------------------+
+| g1tmathss      | Total math scale score SAT    |                            |
+|                | grade 1                       |                            |
++----------------+-------------------------------+----------------------------+
+
+: Table 1: Chosen Variables
+
+# Data Pre-Processing
+
+```{r, results='hide'}
+#loading data
+STAR = read_sav("STAR_Students.sav")
+#exploring the variable g1tchid
+countNA(STAR$g1tchid)
+#checking if there is an overlap of students across different grades
+table(STAR$FLAGSGK, STAR$FLAGSG1)
+#keep students who were enrolled in project STAR in grade 1
+data = subset(STAR, FLAGSG1 == 1)
+#Keeping only relevant columns for the analysis
+data = data[c('g1schid', 'g1surban', 'g1tchid', 'g1thighdegree', 'g1tcareer', 'g1tyears', 'g1classtype', 'g1classsize', 'g1tmathss')]
+#checking the updated dataset
+summary(data)
+#dropping NAs in g1mathss
+data = data[!is.na(data$g1tmathss),]
+#checking the updated dataset
+summary(data)
+#checking if each school has at least one class of each type
+(cont_table = table(data$g1schid,data$g1classtype))
+cont_table[which(cont_table[,3] == 0), ]
+#exclude the schools that do not have "regular+aid" class
+no_regular_aid = c(244728,244736,244796,244839)
+data = data[-which(data$g1schid %in% no_regular_aid),]
+
+#Checking the type of each variable
+sapply(data, class)
+
+data$g1schid = as.factor(data$g1schid)
+data$g1surban = as.factor(data$g1surban)
+data$g1tchid = as.factor(data$g1tchid)
+data$g1thighdegree = as.factor(data$g1thighdegree)
+data$g1tcareer = as.factor(data$g1tcareer)
+data$g1classtype = as.factor(data$g1classtype)
+
+sapply(data, class)
+```
+
+The initial dataset had 11601 students who participated in STAR for at least one
+year. It contains details of 379 variables ranging from demographic information
+of students and teachers, school and class identifiers, the three different
+class assignments, school and teacher information and different test scores.
+
+**Dropping Missing Values:**
+
+-   **Missing values in the teacher identifying variable (g1tchid):** In the
+    following analysis, we will be treating each teacher as a basic unit of the
+    analysis to study the association of class size and math scores of first
+    graders. Therefore, we explored the variable g1tchid first. We noticed that
+    there are 4772 missing observations out of the 11601 total. This raised the
+    question of whether 6829 students (11601-4772) were all grade 1 students and
+    the missing observations were pupils from other grades combined. That would
+    be very questionable which is why we checked and confirmed that the 6829
+    students were those who were either in or those who have already graduated
+    from grade 1 during the time of data collection. Therefore, we dropped the
+    missing values from the original dataset and we were left with observations
+    of students who had grade 1 data.
+
+-   **Missing values in the grade 1 math score variable (g1mathss):** Since our
+    response variable was the math scaled score of grade 1 students, missing
+    data of this variable of grade 1 students could mean one of the following:
+    they did not sit for the exam or their exam scores were not recorded.
+    Therefore, these observations were dropped leaving us with 6598
+    observations.
+
+-   **Missing class type "regular + aid" in 4 schools:** The experimental design
+    of STAR required each school to have at least 1 class type in each grade. 4
+    schools were observed to miss at least 1 class of the class type: regular +
+    aid. Therefore, these schools were dropped from the dataset leaving us with
+    6334 observations.
+
+# Descriptive Analysis
+
+## **Univariate Summary Statistics**
+
+The following table contains the summary statistics of Quantitative Variables.
+
+```{r}
+#Summary statistics of Quantitative Variables
+st(data[,c('g1tmathss','g1tyears', 'g1classsize')], col.breaks = 3,
+   summ = list(
+     c('countNA(x)', 'mean(x)',   'sd(x)', 'min(x)', 'pctile(x)[25]', 'median(x)', 'pctile(x)[75]', 'max(x)'),
+     c('notNA(x)','mean(x)')
+   ),
+   summ.names = list(
+     c('NA','Mean','SD','Min', 'Q1','Median','Q3', 'Max'),
+     c('Count','Percent')
+   ), labels = c('Grade 1 Math Scores (g1tmathss) ', 'Teachers Total Experience in Grade 1 (g1tyears)', 'Grade 1 Class Size (g1classsize)'),
+   title = "Table 2: Summary Statistics of Quantitative Variables")
+```
+
+Figure 1 below shows the distribution of the categorical variables. We can
+notice from the distribution of Urbanicity that rural schools (indicated by
+level 3) were majority of the participant compared to Inner City (1), Suburban
+(2) and Urban (40). The distribution of the highest degree received by teacher's
+seems heavily skewed to the right, indicating most teacher's of grade 1 having
+bachelor's degree (shown by level 2). The distribution of teacher's career
+ladder shows a peak at level 4, meaning majority of the grade 1 teacher's were
+at career ladder level 1 compared to other levels. Finally, the three class
+types (small, regular and regular with aide) seem roughly uniformly distributed
+with regular classes being the highest in number across grade 1 classes.
+
+```{r, fig.cap='Figure 1: Distribution of Categorical Variables'}
+u = ggplot(data, aes(x = `g1surban`)) +
+        geom_bar() + xlab('Urbanicity')
+thd = ggplot(data, aes(x = `g1thighdegree`)) +
+        geom_bar() + xlab(bquote("Teacher's Highest Degree"))
+tcar = ggplot(data, aes(x = `g1tcareer`)) +
+        geom_bar() + xlab(bquote("Teacher's Career Ladder"))
+ct = ggplot(data, aes(x = `g1classtype`)) +
+        geom_bar() + xlab('Class Type')
+grid.arrange(u, thd, tcar, ct, 
+             layout_matrix = matrix(c(1,2,3,4), ncol = 2, byrow = TRUE))
+```
+
+It can noticed from the dataset that there are several students who have been
+assigned to each unique teachers. Since we want to treat each teacher as a
+statistical unit of measurement, we therefore have to aggregate the students'
+math score in grade 1 to get a summary of the scores for each teacher/class. We
+decided to use quantiles (first quartile, median, and third quartile) as the
+summary measures, since the median would be less affected by outliers and skewed
+data compared to mean score, and the first and third quartiles will give us an
+insight into what effect class size has on the weaker and stronger students in a
+class respectively. The final dataset for the analysis consists of 325
+observations (classes) across 72 schools.
+
+```{r, warning = FALSE, message=FALSE}
+#Using percentile statistics to aggregate the students' math score in grade 1 according to unique teachers
+dataset_teacher = data %>%
+  group_by(g1schid, g1surban, g1tchid, g1tyears, g1thighdegree, g1tcareer, g1classtype, g1classsize) %>%
+  summarise(q1 = quantile(g1tmathss, probs = 0.25),
+            med = quantile(g1tmathss, probs = 0.5),
+            q3 = quantile(g1tmathss, probs = 0.75))
+
+datatable(head(dataset_teacher))
+```
+
+Figure 2 below is used to visualize the distribution of the quantile math
+scores. Left panel: Shows the distribution of the three quantiles of math scores
+and all three seems roughly normally distributed. Right panel: Shows the
+distribution of the Quantile math scores against the three class types. For all
+the quantile levels, we can see that grade 1 students belonging to smaller
+classes are performing better in math with students in regular classes
+performing the worst among the three.
+
+```{r, fig.cap='Figure 2: Distribution of Math Scores'}
+# Distribution of Math Scores in Different Quantiles
+dis = ggplot(dataset_teacher) + 
+  xlab("Quantile Math Scores") +
+  geom_textdensity(aes(x = q1), colour = 'darkblue', alpha = 0.5, label = 'Q1', hjust = 0.3) +
+  geom_textdensity(aes(x = med), colour = 'blue', alpha = 0.5, label = 'Median', hjust = 0.3) +
+  geom_textdensity(aes(x = q3), colour = 'black', alpha = 0.5, label = 'Q3', hjust = 0.3)
+  
+
+#Checking the effect of class type on Grade 1 math scores.
+
+#boxplot of Q1 math scores vs. class types
+boxplot_score_class = ggplot(dataset_teacher, aes(g1classtype ,q1)) + aes(fill = g1classtype) 
+ctq1 = boxplot_score_class + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + xlab("Class Types") + ylab("Q1 Math Scores") + scale_fill_discrete(name="Class Type")
+
+#boxplot of Median math scores vs. class types
+boxplot_score_class = ggplot(dataset_teacher, aes(g1classtype ,med)) + aes(fill = g1classtype) 
+ctmed = boxplot_score_class + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + xlab("Class Types") + ylab("Median Math Scores") + scale_fill_discrete(name="Class Type")
+
+#boxplot of Q3 math scores vs. class types
+boxplot_score_class = ggplot(dataset_teacher, aes(g1classtype ,q3)) + aes(fill = g1classtype) 
+ctq3 = boxplot_score_class + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + xlab("Class Types") + ylab("Q3 Math Scores") + scale_fill_discrete(name="Class Type")
+
+grid.arrange(dis, ctq1, ctmed, ctq3, 
+             layout_matrix = matrix(c(1,2,1,3,1,4), ncol=2, byrow = TRUE))
+```
+
+## Multivatiate Analysis
+
+Several multivariate graphs were plotted to understand the association of both
+the quantitative and qualitative variables with grade 1 math scores.
+
+Figure 3 shows a scatterplot of math scores against different class size colour
+coded by the three quantile scores. We can notice a clear downward trend between
+class size and math scores showing that the size of a class negatively effects
+the overall math performance of first graders.
+
+```{r, fig.cap='Figure 3: Scatterplot of Math Scores and Class Size'}
+#Scatterplot of Math Scores vs Class Size
+ggplot(dataset_teacher, aes(x = g1classsize)) + xlab("Class Size in Grade 1") +
+  geom_point(aes(y = q1, col = 'red'), ) + 
+  geom_point(aes(y = med, col = 'blue')) + 
+  geom_point(aes(y = q3, col = 'green')) + 
+  guides(color = guide_legend(title = "Quantiles")) +
+  scale_color_discrete(labels = c("Q1", "Q3", "Median")) +
+  ylab('Math Scores')
+```
+
+Figure 4 below shows the boxplots of the quantile scores against the location of
+schools. We can notice a trend between these two variables; on average rural
+(level 3) and urban schools (level 4) are showing higher math scores compared to
+inner city (level 1) and suburban (level 4).
+
+```{r, fig.cap='Figure 4: Boxplots of Quantile Math Scores and Urbanicity'}
+#Checking the effect of location on Grade 1 math scores.
+
+#boxplot of Q1 math scores vs. different school location
+boxplot_score_class = ggplot(dataset_teacher, aes(g1surban ,q1)) 
+msu1 = boxplot_score_class + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + xlab("Urbanicity") + ylab("Q1 Math Scores")
+
+#boxplot of Median math scores vs. different school location
+boxplot_score_class = ggplot(dataset_teacher, aes(g1surban ,med)) 
+msumed = boxplot_score_class + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + xlab("Urbanicity") + ylab("Median Math Scores")
+
+#boxplot of Q3 math scores vs. different school location
+boxplot_score_class = ggplot(dataset_teacher, aes(g1surban ,q3))
+msu3 = boxplot_score_class + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + xlab("Urbanicity") + ylab("Q3 Math Scores")
+
+grid.arrange(msu1, msumed, msu3, 
+             layout_matrix = matrix(c(2,1,2,3), ncol = 2, byrow = TRUE))
+```
+
+Figure 5 below shows the scatterplot of the quantile math scores against
+different school ID colour coded by the location of the schools. We cannot
+visually see any trend between the math scores and different schools.
+
+```{r, fig.cap='Figure 5: Scatterplot of Quantile Math Scores and School ID colour coded by Urbanicity'}
+#scatterplot of Q1 math scores vs school IDs
+s1 = scatterplot_score_schoolID = ggplot(dataset_teacher, aes(g1schid, q1, color = g1surban))+geom_point() + xlab("School ID") + labs(color = "Urbanicity") + ylab("Q1 Math Scores")
+
+#scatterplot of median math scores vs school IDs
+s2 = scatterplot_score_schoolID = ggplot(dataset_teacher, aes(g1schid, med, color = g1surban))+geom_point() + xlab("School ID") + labs(color = "Urbanicity") + ylab("Median Math Scores")
+
+#scatterplot of Q3 math scores vs school IDs
+s3 = scatterplot_score_schoolID = ggplot(dataset_teacher, aes(g1schid, q3, color = g1surban))+geom_point() + xlab("School ID") + labs(color = "Urbanicity") + ylab("Q1 Math Scores")
+
+grid.arrange(s1, s2, s3, 
+             layout_matrix = matrix(c(1,2,3)))
+```
+
+Several multivariate graphs were plotted to see if there is any association
+between the quantile math scores and variables related to teachers (g1tyears,
+g1career and g1thighdegree). We could not see any significant trend between
+quantile math scores and the teacher variables.
+
+```{r, results='hide'}
+
+#Scatterplot of math scores vs years of teachers' experience
+te = ggplot(dataset_teacher, aes(x = g1tyears)) + xlab("Years of Total Teaching Experience in Grade 1") +
+  geom_point(aes(y = q1, col = 'red')) + 
+  geom_point(aes(y = med, col = 'blue')) + 
+  geom_point(aes(y = q3, col = 'green')) + 
+  guides(color = guide_legend(title = "Quantiles")) +
+  ylab('Math Scores')
+
+#grid.arrange(te, cs, 
+             #layout_matrix = matrix(c(1,2)))
+
+#Checking the effect of teacher's degree level on Grade 1 math scores.
+
+#boxplot of Q1 math scores vs. teacher's degree level
+boxplot_score_class = ggplot(dataset_teacher, aes(g1thighdegree ,q1))
+msd1 = boxplot_score_class + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + xlab("Teacher's Degree Level") + ylab("Q1 Math Scores")
+
+#boxplot of Median math scores vs. teacher's degree level
+boxplot_score_class = ggplot(dataset_teacher, aes(g1thighdegree ,med)) 
+msdmed = boxplot_score_class + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + xlab("Teacher's Degree Level") + ylab("Median Math Scores")
+
+#boxplot of Q3 math scores vs. teacher's degree level
+boxplot_score_class = ggplot(dataset_teacher, aes(g1thighdegree ,q3)) 
+msd3 = boxplot_score_class + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + xlab("Teacher's Degree Level") + ylab("Q3 Math Scores")
+
+#grid.arrange(cttd1, cttdmed, cttd3, 
+             #layout_matrix = matrix(c(1,2,3)))
+
+#Checking the effect of teacher's degree level and different class types on Grade 1 math scores.
+
+#boxplot of Q1 math scores vs. teacher's degree level and class types
+boxplot_score_class = ggplot(dataset_teacher, aes(g1thighdegree ,q1)) + aes(col = g1classtype) 
+cttd1 = boxplot_score_class + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + xlab("Teacher's Degree Level") + ylab("Q1 Math Scores")
+
+#boxplot of Median math scores vs. teacher's degree level and class types
+boxplot_score_class = ggplot(dataset_teacher, aes(g1thighdegree ,med)) + aes(col = g1classtype)  
+cttdmed = boxplot_score_class + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + xlab("Teacher's Degree Level") + ylab("Median Math Scores")
+
+#boxplot of Q3 math scores vs. teacher's degree level and class types
+boxplot_score_class = ggplot(dataset_teacher, aes(g1thighdegree ,q3)) + aes(col = g1classtype) 
+cttd3 = boxplot_score_class + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + xlab("Teacher's Degree Level") + ylab("Q3 Math Scores")
+
+#grid.arrange(cttd1, cttdmed, cttd3, 
+             #layout_matrix = matrix(c(1,2,3)))
+
+#Checking the effect of teacher's career ladder on Grade 1 math scores.
+
+#boxplot of Q1 math scores vs. teacher's career ladder
+boxplot_score_class = ggplot(dataset_teacher, aes(g1tcareer ,q1))
+msct1 = boxplot_score_class + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + xlab("Teacher's Career Ladder") + ylab("Q1 Math Scores")
+
+#boxplot of Median math scores vs. teacher's career ladder
+boxplot_score_class = ggplot(dataset_teacher, aes(g1tcareer ,med))
+msctmed = boxplot_score_class + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + xlab("Teacher's Career Ladder") + ylab("Median Math Scores")
+
+#boxplot of Q3 math scores vs. teacher's career ladder
+boxplot_score_class = ggplot(dataset_teacher, aes(g1tcareer ,q3))
+msct3 = boxplot_score_class + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + xlab("Teacher's Career Ladder") + ylab("Q3 Math Scores")
+
+#grid.arrange(msct1, msctmed, msct3, 
+             #layout_matrix = matrix(c(1,2,3)))
+
+#Checking the effect of teacher's career ladder and different class types on Grade 1 math scores.
+
+#boxplot of Q1 math scores vs. teacher's career ladder and class types
+boxplot_score_class = ggplot(dataset_teacher, aes(g1tcareer ,q1)) + aes(col = g1classtype) 
+cttc1 = boxplot_score_class + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + xlab("Teacher's Career Ladder") + ylab("Q1 Math Scores")
+
+#boxplot of Median math scores vs. teacher's career ladder and class types
+boxplot_score_class = ggplot(dataset_teacher, aes(g1tcareer ,med)) + aes(col = g1classtype)  
+cttcmed = boxplot_score_class + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + xlab("Teacher's Career Ladder") + ylab("Median Math Scores")
+
+#boxplot of Q3 math scores vs. teacher's career ladder and class types
+boxplot_score_class = ggplot(dataset_teacher, aes(g1tcareer ,q3)) + aes(col = g1classtype) 
+cttc3 = boxplot_score_class + geom_boxplot(outlier.colour = "red", outlier.shape = 1) + xlab("Teacher's Career Ladder") + ylab("Q3 Math Scores")
+
+#grid.arrange(cttc1, cttcmed, cttc3, 
+             #layout_matrix = matrix(c(1,2,3)))
+```
+
+# Inferential Analysis
+
+As our initial model, we define a two-way ANOVA model as follows:
+
+$$ Y_{ijk} = \mu_{..}+\alpha_{i}+\beta_{j}+\epsilon_{ijk}, \\ i = 1,\dots,3 \;j= 1,\dots,72 \;k=1, \dots, 325 $$
+
+where
+
+-   $i$ represents the class type: small ($i=1$), regular ($i=2$) and regular
+    with aide ($i=3$), $j$ represents the school indicator and $k$ represents
+    the teacher/class and $\sum_{i=1}^{3}n_{i}\alpha_{i} = 0$, and
+    $\sum_{i=1}^{72}n_{j}\beta_{j} = 0$. $\epsilon_{ijk}$ are i.i.d.
+    $N(0,\sigma^{2})$.
+
+-   $Y_{ijk}$ represents the median math score of the $i^{th}$ class in the
+    $j^{th}$ school conducted by the $k^{th}$ teacher.
+
+-   $\mu_{..}$ represents the weighted average of the cell means.
+
+-   $\alpha_i$ represents the factor effect due to the different class sizes
+    ($i=1,2,3$)
+
+-   $\beta_{j}$ represents the factor effect due to the different school IDs
+    $j = 1,\dots,72$.
+
+-   $\epsilon_{ijk}$ represents the unexplained effects on median math scores
+    for the $k^{th}$ teacher/class in the $j^{th}$ school and $i^{th}$ class
+    type.
+
+-   The additive model has been chosen without any interaction term
+    $(\alpha\beta)_{ij}$ because the term would represent any interaction
+    between class type and school ID. However, the experimental design of the
+    project has been done in a such a way to ensure that the effects of the
+    class types on the math score are not due to any factors related to the
+    schools.
+
+```{r}
+lm1.1 = lm(med ~ g1classtype + g1schid, dataset_teacher)
+anova_fit1.1 = car::Anova(lm1.1, type = 2)
+kbl(anova_fit1.1, caption = "Table 3: two-way fixed effects ANOVA")
+```
+
+Fitting the above proposed model (Table 3), we observe that both class type and
+school ID have $p-value \approx 0$ and are therefore have a significant effect
+on median math score at a 5% level of significance. However, The effect of the
+school ID is not something we can easily interpret, and it is only included in
+the model as a blocking factor to control for the effects of different schools
+on the math score.
+
+In order to explore the effects of the location of the school in addition to
+class size, while still controlling for the within school variation, a mixed
+effects model was defined as follows:
+
+$$ Y_{ijkl} =  \mu_{...} + \alpha_i + \beta_j + \gamma_k + \epsilon_{ijkl}, \\ i = 1,\dots,3 \;j= 1,\dots,4 \;k=1, \dots, 72 \;l = 1, \dots, 325$$
+
+where
+
+-   $i$ represents the class type: small ($i=1$), regular ($i=2$) and regular
+    with aide ($i=3$), $j$ represents the urbanicity of the school (1 = Inner
+    city, 2 = Suburban, 3 = Rural, 4 = Urban), $k$ represents the school
+    indicator and $l$ represents the teacher/class and
+    $\sum_{i=1}^{3}n_{i}\alpha_{i} = 0$, and
+    $\sum_{i=1}^{72}n_{j}\beta_{j} = 0$. $\epsilon_{ijk}$ are i.i.d.
+    \$N(0,\\sigma \^2) \$
+
+-   $Y_{ijk}$ represents the median math score of the class conducted by teacher
+    $l$ in the school $k$, where the urbanicity is $j$ and the class type is
+    $i$.
+
+-   $\mu_{..}$ represents the weighted average of the cell means.
+
+-   $\alpha_i$ represents the fixed effect due to the different class sizes
+    ($i=1,2,3$), with constraint $\sum \alpha_i =0$
+
+-   $\beta_j$ represents the fixed effect due to the urbanicity of the school
+    ($j=1,2,3,4$), with constraint $\sum \beta_j=0$
+
+-   $\gamma_k$ id the random intercept corresponding to the $k$th school, with
+    constraint $\gamma_k \sim_{i.i.d.} N(0,\sigma_{\gamma}^2)$
+
+-   $\epsilon_{ijkl} \sim_{i.i.d.} N(0, \sigma^2)$ is the random error term
+
+-   All random variables are mutually independent.
+
+```{r}
+options(contrasts = c("contr.treatment", "contr.poly"))
+
+lm2.1 = lmer(med ~ g1classtype + g1surban + (1 | g1schid), dataset_teacher)
+# summary(lm2.1)
+
+kbl(anova(lm2.1), caption = "Table 4: Mixed Effects Model")
+```
+
+Fitting the proposed mixed effects model (Table 4), it is observed that class
+type and school urbanicity have $p-value < 0.5$ and therefore have a significant
+effect on median math score at a 5% level of significance. Before moving
+forward, we will check if the effects of class type and urbanicity or median
+math score are additive or interactive.
+
+```{r, warning=FALSE, message=FALSE}
+lm2.2 = lmer(med ~ g1classtype * g1surban + (1 | g1schid), dataset_teacher)
+# summary(lm1.2)
+
+kbl(anova(lm2.1, lm2.2), caption = "Table 5: Anova test")
+```
+
+From the result of the test above (Table 5), we can conclude at a 5% level of
+significance that class type and school urbanicity have an additive effect on
+grade 1 median math scores. The reported coefficients of our fitted model is
+shown below in Table 6.
+
+```{r}
+kbl(summary(lm2.1)$coefficients, caption = "Table 6: Fitted Coefficients")
+```
+
+The primary question is to see whether there is any difference in the scores of
+first graders across the different class types. To check this we can use the
+F-test at $\alpha=0.05$ significance level.
+
+$$ H_0: \alpha_1 = \alpha_2 = \alpha_3 = 0, \; H_a: \text{not all } \alpha_i \text{ are zero} $$
+
+The p-value for this test is 1.05e-08 as shown in Table 4. Therefore we can
+reject the null and conclude that not all the $\alpha_i$s are zero, meaning
+there exists some association between math scores and the different class types.
+
+The second question of interest is to check which class type is associated with
+the highest math scores in grade 1.
+
+We conducted the Tukey-Kramer pairwise comparison test at $\alpha=0.05$
+significance level.
+
+$$ H_0: \mu_i = \mu_j, \; H_a: \mu_i \ne \mu_j \text{ where } i,j = 1, 2, 3 \;i\ne j$$
+
+From the summary shown below we can see the highest difference in math score
+exists for the pair: small and regular with a highly significant p-value of
+\<1e-06. Therefore, we reject the null hypothesis and conclude that there is a
+significance difference of effects between these two class types on math scores
+of first graders.
+
+```{r}
+summary(glht(lm2.1, mcp(g1classtype = "Tukey")))
+```
+
+# Sensitivity analysis
+
+From the Normal Q-Q plot shown below, we can see that the distribution of the
+residuals appears roughly normally distributed for our model.
+
+```{r, fig.cap="Fig 5: Normal QQ Plot"}
+qqnorm(resid(lm2.1), main = "Residual QQ Plot")
+```
+
+The Shapiro-Wilks test is conducted to further check the normality assumption of
+error terms. The p-value for the test as shown below is 0.001056 meaning that at
+5% significance level, we can reject the null that the residuals follow a normal
+distribution and conclude that non-normality exists.
+
+```{r}
+shapiro.test(summary(lm2.1)$residuals)
+```
+
+```{r, fig.cap="Fig 4: Residual vs. Fitted Values Plot"}
+plot(lm2.1, xlab = "Fitted Values", ylab = "Residuals", main = "Residuals vs. Fitted Values")
+```
+
+From the residual vs fitted plot shown below, we can observe constancy of error
+variance.
+
+## Alternative Models
+
+Earlier, we used the median math scores of 1st graders as our response variable.
+Alternatively, we can check how the assumptions hold using mean math scores of
+grade 1 students. We created a new dataset with the response variable being the
+mean of the scores as shown below:
+
+```{r, message=FALSE, warning=FALSE,results='hide'}
+#Grouping in terms of mean score per unique teacher
+dataset_teacher1 = data %>%
+    group_by(g1schid, g1surban, g1tchid, g1tyears, g1thighdegree, g1tcareer, g1classtype, g1classsize) %>%
+    summarise(math.mean = mean(g1tmathss))
+dataset_teacher1
+```
+
+A new model has been fitted with the response variable now being the mean of the
+math scores of first graders across different class types and school IDs given
+below. It is pretty evident that association between math scores of grade 1
+students and the class types is highly significant. Therefore, we can say that
+this model performs very similar to our first.
+
+```{r}
+lm3 = lmer(math.mean ~ g1classtype + g1surban + (1 | g1schid), dataset_teacher1)
+# summary(lm3)
+kbl(anova(lm3), caption = "Alternative model with mean math score")
+```
+
+Upon performing the Tukey-Kramer pairwise comparison test done below, we can
+draw a very similar conclusion like our previous model. The highest difference
+in math score exists for the pair: small and regular with a highly significant
+the p-value close to 0. Therefore, we reject the null hypothesis and conclude
+that there is a significance difference of effects between these two class types
+on math scores of first graders.
+
+```{r}
+summary(glht(lm3, mcp(g1classtype = "Tukey")))
+```
+
+Therefore, since the alternative model using the mean math score agrees with the
+findings of the model using the median, our chosen mixed effects model with the
+median math score holds up to the sensitivity analysis. Furthermore, The
+conclusions of the model agreed with our initial finding even when the first and
+third quartile scores were used (shown below).
+
+```{r warning=FALSE, message=FALSE}
+lm3.1a = lmer(q1 ~ g1classtype + g1surban + (1 | g1schid), dataset_teacher)
+anova(lm3.1a)
+summary(glht(lm3.1a, mcp(g1classtype = "Tukey")))
+
+
+lm3.1c = lmer(q3 ~ g1classtype + g1surban + (1 | g1schid), dataset_teacher)
+anova(lm3.1c)
+summary(glht(lm3.1c, mcp(g1classtype = "Tukey")))
+```
+
+# Discussion
+
+In this project, we analyzed the effects of class sized on the math performance
+of grade 1 students enrolled in the STAR project. From our analysis, we found
+that small class leads to improved median class performance, with the most
+significant difference observed between students enrolled in small vs. regular
+class types. On average, the median math score for students enrolled in small
+classes was 12.66 points better than those enrolled in regular classes. The
+average Q1 and Q3 scores of students in small classes was similarly 16.75 and
+16.00 points better than regular classes. Further analysis can be conducted to
+dig deeper and determine if other demographic factors also play a role in
+student performance.
+
+# References
